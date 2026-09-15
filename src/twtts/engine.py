@@ -21,6 +21,9 @@ BREEZE2_ROOT = Path(
 KOKORO_ROOT = Path(
     os.environ.get("TWTTS_KOKORO_DIR", ROOT / "models" / "kokoro-multi-lang-v1_1")
 )
+AISHELL3_ROOT = Path(
+    os.environ.get("TWTTS_AISHELL3_DIR", ROOT / "models" / "vits-icefall-zh-aishell3")
+)
 
 # Keep all runtime data project-local, including when invoked as plain `uv run`.
 os.environ.setdefault("XDG_CACHE_HOME", str(ROOT / ".cache"))
@@ -56,6 +59,7 @@ KOKORO_VOICE_NAMES = tuple(
     """.split()
 )
 KOKORO_VOICE_IDS = {name: index for index, name in enumerate(KOKORO_VOICE_NAMES)}
+AISHELL3_VOICE_NAMES = tuple(str(index) for index in range(174))
 
 
 class PrimeTTSEngine:
@@ -235,10 +239,79 @@ class KokoroEngine:
         return np.clip(np.asarray(audio.samples), -1.0, 1.0).astype(np.float32)
 
 
+class Aishell3Engine:
+    """AISHELL3 Chinese multi-speaker VITS inference through sherpa-onnx."""
+
+    def __init__(self, threads: int | None = None) -> None:
+        files = {
+            "model": AISHELL3_ROOT / "model.onnx",
+            "lexicon": AISHELL3_ROOT / "lexicon.txt",
+            "tokens": AISHELL3_ROOT / "tokens.txt",
+            "phone_fst": AISHELL3_ROOT / "phone.fst",
+            "date_fst": AISHELL3_ROOT / "date.fst",
+            "number_fst": AISHELL3_ROOT / "number.fst",
+        }
+        missing = [str(path) for path in files.values() if not path.exists()]
+        if missing:
+            raise RuntimeError("AISHELL3 VITS model is not installed. Run `uv run twtts-setup` first.")
+
+        import sherpa_onnx
+
+        vits = sherpa_onnx.OfflineTtsVitsModelConfig(
+            model=str(files["model"]),
+            lexicon=str(files["lexicon"]),
+            tokens=str(files["tokens"]),
+        )
+        model = sherpa_onnx.OfflineTtsModelConfig(
+            vits=vits,
+            num_threads=threads or max(1, min(4, os.cpu_count() or 1)),
+            debug=False,
+            provider="cpu",
+        )
+        config = sherpa_onnx.OfflineTtsConfig(
+            model=model,
+            rule_fsts=",".join(
+                str(files[key]) for key in ("phone_fst", "date_fst", "number_fst")
+            ),
+            rule_fars="",
+            max_num_sentences=5,
+        )
+        if not config.validate():
+            raise RuntimeError("AISHELL3 VITS model configuration is invalid")
+        self.tts = sherpa_onnx.OfflineTts(config)
+        self.sample_rate = self.tts.sample_rate
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def voice_id(voice: str | int) -> int:
+        if str(voice).lower() == "default":
+            result = 0
+        elif isinstance(voice, int) or str(voice).isdigit():
+            result = int(voice)
+        else:
+            result = -1
+        if result not in range(len(AISHELL3_VOICE_NAMES)):
+            raise ValueError("voice must be default or an integer from 0-173")
+        return result
+
+    def synthesize(self, text: str, voice: str | int = "default", speed: float = 1.0) -> np.ndarray:
+        text = text.strip()
+        if not text:
+            raise ValueError("text cannot be empty")
+        if not 0.5 <= speed <= 2.0:
+            raise ValueError("speed must be between 0.5 and 2.0")
+        with self._lock:
+            audio = self.tts.generate(text=text, sid=self.voice_id(voice), speed=speed)
+        if len(audio.samples) == 0:
+            raise ValueError("text produced no pronounceable symbols")
+        return np.clip(np.asarray(audio.samples), -1.0, 1.0).astype(np.float32)
+
+
 MODELS = {
     "primetts": PrimeTTSEngine,
     "breeze2": Breeze2Engine,
     "kokoro": KokoroEngine,
+    "aishell3": Aishell3Engine,
 }
 
 
@@ -260,6 +333,7 @@ class TTSEngine:
             "primetts": "xinran",
             "breeze2": "default",
             "kokoro": "zf_001",
+            "aishell3": "default",
         }[self.model]
         return self.backend.synthesize(text, voice or default_voice, speed)
 

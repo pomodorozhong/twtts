@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .engine import KOKORO_VOICE_NAMES, TTSEngine
+from .engine import AISHELL3_VOICE_NAMES, KOKORO_VOICE_NAMES, TTSEngine
 
 app = FastAPI(title="Local Mandarin TTS", version="0.1.0")
 _engines: dict[str, TTSEngine] = {}
@@ -47,6 +47,7 @@ def health() -> dict[str, object]:
             "primetts": {"voices": ["xinran", "anchen", "bowen"]},
             "breeze2": {"voices": ["default"]},
             "kokoro": {"voices": list(KOKORO_VOICE_NAMES), "sample_rate": 24000},
+            "aishell3": {"voices": list(AISHELL3_VOICE_NAMES), "sample_rate": 8000},
         },
     }
 

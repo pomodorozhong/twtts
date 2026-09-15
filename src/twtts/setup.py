@@ -14,6 +14,10 @@ KOKORO_URL = (
     "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/"
     "kokoro-multi-lang-v1_1.tar.bz2"
 )
+AISHELL3_URL = (
+    "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/"
+    "vits-icefall-zh-aishell3.tar.bz2"
+)
 
 
 def download_archive(url: str, destination: Path) -> None:
@@ -98,6 +102,21 @@ def main() -> None:
     else:
         print("Kokoro multilingual model files already present.")
 
+    aishell3_root = ROOT / "models" / "vits-icefall-zh-aishell3"
+    aishell3_files = (
+        aishell3_root / "model.onnx",
+        aishell3_root / "lexicon.txt",
+        aishell3_root / "tokens.txt",
+        aishell3_root / "phone.fst",
+        aishell3_root / "date.fst",
+        aishell3_root / "number.fst",
+    )
+    if not all(path.exists() for path in aishell3_files):
+        print("Downloading AISHELL3 VITS model files…")
+        download_archive(AISHELL3_URL, ROOT / "models")
+    else:
+        print("AISHELL3 VITS model files already present.")
+
     # Initialize once so G2PW and its tokenizer are downloaded during setup.
     from .engine import TTSEngine
 
@@ -107,10 +126,13 @@ def main() -> None:
     TTSEngine("breeze2")
     print("Checking Kokoro multilingual…")
     TTSEngine("kokoro")
+    print("Checking AISHELL3 VITS…")
+    TTSEngine("aishell3")
     print("Setup complete.")
     print("Try: uv run twtts '大家好，這是臺灣華語測試。' -o output/test.mp3")
     print("Or:  uv run twtts --model breeze2 '大家好，這是臺灣華語測試。' -o output/breeze2.mp3")
     print("Or:  uv run twtts --model kokoro 'Hello，這是 Kokoro。' --voice zf_001 -o output/kokoro.mp3")
+    print("Or:  uv run twtts --model aishell3 '你好，這是 AISHELL3。' --voice 10 -o output/aishell3.mp3")
 
 
 if __name__ == "__main__":

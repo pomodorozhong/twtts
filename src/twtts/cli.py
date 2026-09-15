@@ -12,11 +12,14 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("text", nargs="?", help="text to speak; reads stdin when omitted")
     p.add_argument("-o", "--output", default="output.mp3", help=".mp3/.wav path, or - for stdout")
     p.add_argument("--format", choices=("mp3", "wav"), help="required only when output is stdout")
-    p.add_argument("--model", default="primetts", choices=("primetts", "breeze2", "kokoro"))
+    p.add_argument(
+        "--model", default="primetts", choices=("primetts", "breeze2", "kokoro", "aishell3")
+    )
     p.add_argument(
         "--voice",
         help="PrimeTTS: xinran/anchen/bowen; Breeze2: default; "
-        "Kokoro: speaker name (for example zf_001) or 0-102",
+        "Kokoro: speaker name (for example zf_001) or 0-102; "
+        "AISHELL3: default or 0-173",
     )
     p.add_argument("--speed", type=float, default=1.0, help="0.5 to 2.0 (default: 1.0)")
     return p
