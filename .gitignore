@@ -1,0 +1,9 @@
+.venv/
+.cache/
+models/
+output/
+*.mp3
+*.wav
+__pycache__/
+.DS_Store
+:memory:.ses
