@@ -37,13 +37,23 @@ def main() -> None:
         ],
     )
 
+    print("Downloading Breeze2-VITS-ONNX model files…")
+    snapshot_download(
+        repo_id="MediaTek-Research/Breeze2-VITS-onnx",
+        local_dir=ROOT / "models" / "Breeze2-VITS-onnx",
+        allow_patterns=["breeze2-vits.onnx", "lexicon.txt", "tokens.txt", "README.md"],
+    )
+
     # Initialize once so G2PW and its tokenizer are downloaded during setup.
     from .engine import TTSEngine
 
     print("Initializing the Taiwanese pronunciation model…")
-    TTSEngine()
+    TTSEngine("primetts")
+    print("Checking Breeze2-VITS-ONNX…")
+    TTSEngine("breeze2")
     print("Setup complete.")
     print("Try: uv run twtts '大家好，這是臺灣華語測試。' -o output/test.mp3")
+    print("Or:  uv run twtts --model breeze2 '大家好，這是臺灣華語測試。' -o output/breeze2.mp3")
 
 
 if __name__ == "__main__":

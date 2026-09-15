@@ -13,6 +13,8 @@ dependencies = [
   "numpy>=2.0",
   "onnxruntime>=1.22",
   "requests>=2.32",
+  "sherpa-onnx>=1.13.8",
+  "sherpa-onnx-core==1.13.8",
   "soundfile>=0.13",
   "torch>=2.7",
   "uvicorn>=0.35",

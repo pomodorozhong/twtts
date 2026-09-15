@@ -10,27 +10,28 @@ from pydantic import BaseModel
 from .engine import TTSEngine
 
 app = FastAPI(title="Taiwanese Mandarin TTS", version="0.1.0")
-_engine: TTSEngine | None = None
+_engines: dict[str, TTSEngine] = {}
 
 
-def engine() -> TTSEngine:
-    global _engine
-    if _engine is None:
-        _engine = TTSEngine()
-    return _engine
+def engine(model: str) -> TTSEngine:
+    if model not in _engines:
+        _engines[model] = TTSEngine(model)
+    return _engines[model]
 
 
 class TTSRequest(BaseModel):
     text: str
-    voice: str = "xinran"
+    model: str = "primetts"
+    voice: str | None = None
     speed: float = 1.0
     format: str = "mp3"
 
 
 def response_for(request: TTSRequest) -> StreamingResponse:
     try:
-        payload = engine().encode(
-            engine().synthesize(request.text, request.voice, request.speed), request.format
+        selected = engine(request.model)
+        payload = selected.encode(
+            selected.synthesize(request.text, request.voice, request.speed), request.format
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -40,14 +41,24 @@ def response_for(request: TTSRequest) -> StreamingResponse:
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    return {"ok": True, "model": "PrimeTTS v2.1", "voices": ["xinran", "anchen", "bowen"]}
+    return {
+        "ok": True,
+        "models": {
+            "primetts": {"voices": ["xinran", "anchen", "bowen"]},
+            "breeze2": {"voices": ["default"]},
+        },
+    }
 
 
 @app.get("/tts")
 def tts_get(
-    text: str = Query(min_length=1), voice: str = "xinran", speed: float = 1.0, format: str = "mp3"
+    text: str = Query(min_length=1),
+    model: str = "primetts",
+    voice: str | None = None,
+    speed: float = 1.0,
+    format: str = "mp3",
 ) -> StreamingResponse:
-    return response_for(TTSRequest(text=text, voice=voice, speed=speed, format=format))
+    return response_for(TTSRequest(text=text, model=model, voice=voice, speed=speed, format=format))
 
 
 @app.post("/tts")
