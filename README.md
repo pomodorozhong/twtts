@@ -2,6 +2,7 @@
 
 Standalone, fully local Mandarin TTS with four conventional acoustic models:
 **PrimeTTS v2.1**, **Breeze2-VITS-ONNX**, **Kokoro multilingual v1.1**, and **AISHELL3 VITS**.
+Only the first two models are Taiwanese; the other models are included for comparison only.
 Neither runtime is an LLM or a macOS system voice.
 
 ## Setup
