@@ -7,8 +7,12 @@ Neither runtime is an LLM or a macOS system voice.
 ## Setup
 
 ```bash
+hf auth login --force
 uv run twtts-setup
 ```
+
+Hugging Face authentication avoids unauthenticated Hub requests and enables higher rate limits
+and faster model downloads.
 
 ## Generate audio
 
