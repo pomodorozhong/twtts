@@ -1,7 +1,8 @@
 # twtts
 
-Standalone, fully local Taiwanese Mandarin TTS with two conventional acoustic models:
-**PrimeTTS v2.1** and **Breeze2-VITS-ONNX**. Neither runtime is an LLM or a macOS system voice.
+Standalone, fully local Mandarin TTS with three conventional acoustic models:
+**PrimeTTS v2.1**, **Breeze2-VITS-ONNX**, and **Kokoro multilingual v1.1**. Neither runtime is
+an LLM or a macOS system voice.
 
 ## Setup
 
@@ -14,12 +15,15 @@ uv run twtts-setup
 ```bash
 uv run twtts "大家好，這是臺灣華語語音合成測試。" -o output/hello.mp3
 uv run twtts --model breeze2 "大家好，這是 Breeze2。" -o output/breeze2.mp3
+uv run twtts --model kokoro "Hello, 這是 Kokoro。" --voice zf_001 -o output/kokoro.mp3
 uv run twtts "研究品質很重要。" --voice anchen --speed 1.1 -o output/hello.wav
 echo "歡迎光臨" | uv run twtts - --format mp3 > output/stdout.mp3
 ```
 
 PrimeTTS voices: `xinran` (female), `anchen` (male), and `bowen` (male). Breeze2 currently
-has one voice, selected automatically; use `--voice default` if you want to specify it.
+has one voice, selected automatically; use `--voice default` if you want to specify it. Kokoro
+supports 103 speakers (`zf_*` Chinese voices, `zm_*` Chinese voices, and `af_maple`, `af_sol`,
+and `bf_vale` English voices); pass a name or a numeric ID from 0 to 102.
 
 ## Local HTTP audio endpoint
 
@@ -48,6 +52,7 @@ before sending it; stdout and HTTP are streaming transports, not incremental mod
 
 - Model: [Luigi/PrimeTTS](https://huggingface.co/Luigi/PrimeTTS), Apache-2.0
 - Model: [MediaTek Research/Breeze2-VITS-onnx](https://huggingface.co/MediaTek-Research/Breeze2-VITS-onnx); its model card does not currently declare a license
-- Runtime: ONNX Runtime (PrimeTTS) and sherpa-onnx (Breeze2), on CPU
-- Frontend: Taiwan Bopomofo via G2PW, with Traditional Chinese and English code-mixing
-- Audio: mono, 16 kHz (PrimeTTS) or 22.05 kHz (Breeze2); MP3 encoding uses `ffmpeg`
+- Model: [Kokoro multilingual v1.1](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh), Apache-2.0
+- Runtime: ONNX Runtime (PrimeTTS) and sherpa-onnx (Breeze2/Kokoro), on CPU
+- Frontend: Taiwan Bopomofo via G2PW for PrimeTTS; sherpa-onnx lexicons for Breeze2 and Kokoro
+- Audio: mono, 16 kHz (PrimeTTS), 22.05 kHz (Breeze2), or 24 kHz (Kokoro); MP3 encoding uses `ffmpeg`

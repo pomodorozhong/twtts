@@ -7,9 +7,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .engine import TTSEngine
+from .engine import KOKORO_VOICE_NAMES, TTSEngine
 
-app = FastAPI(title="Taiwanese Mandarin TTS", version="0.1.0")
+app = FastAPI(title="Local Mandarin TTS", version="0.1.0")
 _engines: dict[str, TTSEngine] = {}
 
 
@@ -46,6 +46,7 @@ def health() -> dict[str, object]:
         "models": {
             "primetts": {"voices": ["xinran", "anchen", "bowen"]},
             "breeze2": {"voices": ["default"]},
+            "kokoro": {"voices": list(KOKORO_VOICE_NAMES), "sample_rate": 24000},
         },
     }
 
@@ -69,7 +70,7 @@ def tts_post(request: TTSRequest) -> StreamingResponse:
 def main() -> None:
     import uvicorn
 
-    p = argparse.ArgumentParser(description="Run the local Taiwanese Mandarin TTS API")
+    p = argparse.ArgumentParser(description="Run the local Mandarin TTS API")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
     args = p.parse_args()

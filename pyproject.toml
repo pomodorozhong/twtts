@@ -1,7 +1,7 @@
 [project]
 name = "twtts"
 version = "0.1.0"
-description = "Local non-LLM Taiwanese Mandarin text-to-speech"
+description = "Local non-LLM Mandarin text-to-speech"
 requires-python = ">=3.11,<3.13"
 dependencies = [
   "cn2an>=0.5.23",

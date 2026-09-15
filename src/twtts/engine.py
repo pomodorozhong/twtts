@@ -18,6 +18,9 @@ PRIMETTS_SCRIPTS = PRIMETTS_ROOT / "scripts"
 BREEZE2_ROOT = Path(
     os.environ.get("TWTTS_BREEZE2_DIR", ROOT / "models" / "Breeze2-VITS-onnx")
 )
+KOKORO_ROOT = Path(
+    os.environ.get("TWTTS_KOKORO_DIR", ROOT / "models" / "kokoro-multi-lang-v1_1")
+)
 
 # Keep all runtime data project-local, including when invoked as plain `uv run`.
 os.environ.setdefault("XDG_CACHE_HOME", str(ROOT / ".cache"))
@@ -33,6 +36,26 @@ VOICE_IDS = {
     "bowen": 2,
     "male2": 2,
 }
+
+# The speaker table is published with the sherpa-onnx Kokoro v1.1-zh model.
+# Keep names available in the CLI while still accepting the numeric speaker ID.
+KOKORO_VOICE_NAMES = tuple(
+    """
+    af_maple af_sol bf_vale
+    zf_001 zf_002 zf_003 zf_004 zf_005 zf_006 zf_007 zf_008 zf_017 zf_018
+    zf_019 zf_021 zf_022 zf_023 zf_024 zf_026 zf_027 zf_028 zf_032 zf_036
+    zf_038 zf_039 zf_040 zf_042 zf_043 zf_044 zf_046 zf_047 zf_048 zf_049
+    zf_051 zf_059 zf_060 zf_067 zf_070 zf_071 zf_072 zf_073 zf_074 zf_075
+    zf_076 zf_077 zf_078 zf_079 zf_083 zf_084 zf_085 zf_086 zf_087 zf_088
+    zf_090 zf_092 zf_093 zf_094 zf_099
+    zm_009 zm_010 zm_011 zm_012 zm_013 zm_014 zm_015 zm_016 zm_020 zm_025
+    zm_029 zm_030 zm_031 zm_033 zm_034 zm_035 zm_037 zm_041 zm_045 zm_050
+    zm_052 zm_053 zm_054 zm_055 zm_056 zm_057 zm_058 zm_061 zm_062 zm_063
+    zm_064 zm_065 zm_066 zm_068 zm_069 zm_080 zm_081 zm_082 zm_089 zm_091
+    zm_095 zm_096 zm_097 zm_098 zm_100
+    """.split()
+)
+KOKORO_VOICE_IDS = {name: index for index, name in enumerate(KOKORO_VOICE_NAMES)}
 
 
 class PrimeTTSEngine:
@@ -146,14 +169,81 @@ class Breeze2Engine:
         return np.clip(np.asarray(audio.samples), -1.0, 1.0).astype(np.float32)
 
 
+class KokoroEngine:
+    """Kokoro v1.1 Chinese/English inference through sherpa-onnx."""
+
+    def __init__(self, threads: int | None = None) -> None:
+        files = {
+            "model": KOKORO_ROOT / "model.onnx",
+            "voices": KOKORO_ROOT / "voices.bin",
+            "tokens": KOKORO_ROOT / "tokens.txt",
+            "data_dir": KOKORO_ROOT / "espeak-ng-data",
+            "lexicon_en": KOKORO_ROOT / "lexicon-us-en.txt",
+            "lexicon_zh": KOKORO_ROOT / "lexicon-zh.txt",
+        }
+        missing = [str(path) for path in files.values() if not path.exists()]
+        if missing:
+            raise RuntimeError(
+                "Kokoro multilingual model is not installed. "
+                "Run `uv run twtts-setup` first."
+            )
+
+        import sherpa_onnx
+
+        kokoro = sherpa_onnx.OfflineTtsKokoroModelConfig(
+            model=str(files["model"]),
+            voices=str(files["voices"]),
+            tokens=str(files["tokens"]),
+            data_dir=str(files["data_dir"]),
+            lexicon=f"{files['lexicon_en']},{files['lexicon_zh']}",
+        )
+        model = sherpa_onnx.OfflineTtsModelConfig(
+            kokoro=kokoro,
+            num_threads=threads or max(1, min(4, os.cpu_count() or 1)),
+            debug=False,
+            provider="cpu",
+        )
+        config = sherpa_onnx.OfflineTtsConfig(
+            model=model, rule_fsts="", rule_fars="", max_num_sentences=5
+        )
+        if not config.validate():
+            raise RuntimeError("Kokoro multilingual model configuration is invalid")
+        self.tts = sherpa_onnx.OfflineTts(config)
+        self.sample_rate = self.tts.sample_rate
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def voice_id(voice: str | int) -> int:
+        if isinstance(voice, int) or str(voice).isdigit():
+            result = int(voice)
+        else:
+            result = KOKORO_VOICE_IDS.get(str(voice).lower(), -1)
+        if result not in range(len(KOKORO_VOICE_NAMES)):
+            raise ValueError("voice must be a Kokoro speaker name or an integer from 0-102")
+        return result
+
+    def synthesize(self, text: str, voice: str | int = "zf_001", speed: float = 1.0) -> np.ndarray:
+        text = text.strip()
+        if not text:
+            raise ValueError("text cannot be empty")
+        if not 0.5 <= speed <= 2.0:
+            raise ValueError("speed must be between 0.5 and 2.0")
+        with self._lock:
+            audio = self.tts.generate(text=text, sid=self.voice_id(voice), speed=speed)
+        if len(audio.samples) == 0:
+            raise ValueError("text produced no pronounceable symbols")
+        return np.clip(np.asarray(audio.samples), -1.0, 1.0).astype(np.float32)
+
+
 MODELS = {
     "primetts": PrimeTTSEngine,
     "breeze2": Breeze2Engine,
+    "kokoro": KokoroEngine,
 }
 
 
 class TTSEngine:
-    """Common interface for the installed Taiwanese Mandarin TTS models."""
+    """Common interface for the installed local Mandarin TTS models."""
 
     def __init__(self, model: str = "primetts", threads: int | None = None) -> None:
         model = model.lower()
@@ -166,7 +256,11 @@ class TTSEngine:
     def synthesize(
         self, text: str, voice: str | int | None = None, speed: float = 1.0
     ) -> np.ndarray:
-        default_voice = "xinran" if self.model == "primetts" else "default"
+        default_voice = {
+            "primetts": "xinran",
+            "breeze2": "default",
+            "kokoro": "zf_001",
+        }[self.model]
         return self.backend.synthesize(text, voice or default_voice, speed)
 
     def encode(self, waveform: np.ndarray, format: str = "mp3") -> bytes:
