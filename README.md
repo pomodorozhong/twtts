@@ -23,7 +23,7 @@ uv run twtts --model breeze2 "大家好，這是 Breeze2。" -o output/breeze2.m
 uv run twtts --model kokoro "Hello, 這是 Kokoro。" --voice zf_001 -o output/kokoro.mp3
 uv run twtts --model aishell3 "你好，這是 AISHELL3。" --voice 10 -o output/aishell3.mp3
 uv run twtts "研究品質很重要。" --voice anchen --speed 1.1 -o output/hello.wav
-echo "歡迎光臨" | uv run twtts - --format mp3 > output/stdout.mp3
+echo "歡迎光臨" | uv run twtts - --format mp3 -o - > output/stdout.mp3
 ```
 
 PrimeTTS voices: `xinran` (female), `anchen` (male), and `bowen` (male). Breeze2 currently
